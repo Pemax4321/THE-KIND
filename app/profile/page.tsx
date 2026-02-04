@@ -4,9 +4,6 @@ import { useAuth } from "@/lib/auth-context"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-// Don't prerender this page since it depends on auth
-export const dynamic = 'force-dynamic'
-
 export default function ProfilePage() {
   const { user } = useAuth()
 
