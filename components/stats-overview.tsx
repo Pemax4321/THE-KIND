@@ -1,15 +1,19 @@
+// Stats Overview component - displays key user statistics
 "use client"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Heart, Flame, Target, Award } from "lucide-react"
 import type { UserStats } from "@/lib/data"
 
+// Props interface for StatsOverview
 interface StatsOverviewProps {
-  stats: UserStats | null
-  loading: boolean
+  stats: UserStats | null // User statistics data
+  loading: boolean // Loading state indicator
 }
 
+// StatsOverview component - displays grid of user statistics cards
 export function StatsOverview({ stats, loading }: StatsOverviewProps) {
+  // Define all stat items to display
   const statItems = [
     {
       label: "Total Acts",
@@ -49,12 +53,15 @@ export function StatsOverview({ stats, loading }: StatsOverviewProps) {
         <Card key={item.label} className="shadow-md border-border/50">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
+              {/* Stat icon with background color */}
               <div className={`w-10 h-10 rounded-full ${item.bgColor} flex items-center justify-center`}>
                 <item.icon className={`w-5 h-5 ${item.color}`} />
               </div>
+              {/* Stat value and label */}
               <div>
                 <p className="text-2xl font-bold text-foreground">
                   {loading ? "-" : item.value}
+                  {/* Optional suffix (e.g., " days" for streaks) */}
                   {item.suffix && !loading && <span className="text-sm font-normal text-muted-foreground">{item.suffix}</span>}
                 </p>
                 <p className="text-xs text-muted-foreground">{item.label}</p>

@@ -1,3 +1,4 @@
+// Mood Tracker component - allows users to log their daily mood
 "use client"
 
 import { useState } from "react"
@@ -9,25 +10,32 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { SmilePlus, Loader2 } from "lucide-react"
 
+// Props interface for MoodTracker
 interface MoodTrackerProps {
-  onMoodLogged: () => void
-  recentMoods: MoodEntry[]
+  onMoodLogged: () => void // Callback when mood is successfully logged
+  recentMoods: MoodEntry[] // Array of recent mood entries
 }
 
+// MoodTracker component - mood selection and logging interface
 export function MoodTracker({ onMoodLogged, recentMoods }: MoodTrackerProps) {
+  // Get user from auth context
   const { user } = useAuth()
-  const [selectedMood, setSelectedMood] = useState<string | null>(null)
-  const [note, setNote] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedMood, setSelectedMood] = useState<string | null>(null) // Currently selected mood
+  const [note, setNote] = useState("") // Optional note about mood
+  const [isSubmitting, setIsSubmitting] = useState(false) // Tracks submission state
 
+  // Handles mood entry submission
   const handleSubmit = async () => {
     if (!user || !selectedMood) return
     setIsSubmitting(true)
     try {
+      // Save mood entry to database
       await addMoodEntry(user.id, selectedMood, note || undefined)
       toast.success("Mood logged successfully!")
+      // Reset form
       setSelectedMood(null)
       setNote("")
+      // Notify parent component
       onMoodLogged()
     } catch (error) {
       toast.error("Failed to log mood")
@@ -36,6 +44,7 @@ export function MoodTracker({ onMoodLogged, recentMoods }: MoodTrackerProps) {
     }
   }
 
+  // Check if user has already logged mood today
   const todaysMood = recentMoods.find((m) => {
     const today = new Date()
     return m.createdAt.toDateString() === today.toDateString()
@@ -43,6 +52,7 @@ export function MoodTracker({ onMoodLogged, recentMoods }: MoodTrackerProps) {
 
   return (
     <Card className="shadow-lg border-border/50">
+      {/* Card header with icon and title */}
       <CardHeader className="bg-chart-4/10 border-b border-border/30">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 rounded-full bg-chart-4/20 flex items-center justify-center">
@@ -57,11 +67,14 @@ export function MoodTracker({ onMoodLogged, recentMoods }: MoodTrackerProps) {
         </div>
       </CardHeader>
       <CardContent className="p-6">
+        {/* Show today's mood if already logged */}
         {todaysMood ? (
           <div className="text-center py-4">
+            {/* Display mood emoji */}
             <div className="text-5xl mb-3">
               {moodOptions.find((m) => m.value === todaysMood.mood)?.emoji}
             </div>
+            {/* Display mood label */}
             <p className="text-sm text-muted-foreground">
               You're feeling{" "}
               <span className="font-medium text-foreground">
@@ -69,12 +82,15 @@ export function MoodTracker({ onMoodLogged, recentMoods }: MoodTrackerProps) {
               </span>{" "}
               today
             </p>
+            {/* Display mood note if provided */}
             {todaysMood.note && (
               <p className="text-sm text-muted-foreground mt-2 italic">"{todaysMood.note}"</p>
             )}
           </div>
         ) : (
+          /* Show mood selection interface if not logged today */
           <div className="space-y-4">
+            {/* Mood emoji buttons grid */}
             <div className="grid grid-cols-4 gap-2">
               {moodOptions.map((mood) => (
                 <button
@@ -92,8 +108,10 @@ export function MoodTracker({ onMoodLogged, recentMoods }: MoodTrackerProps) {
                 </button>
               ))}
             </div>
+            {/* Show note input and submit button after mood selection */}
             {selectedMood && (
               <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* Optional note textarea */}
                 <Textarea
                   placeholder="Add a note about how you're feeling (optional)"
                   value={note}
@@ -101,6 +119,7 @@ export function MoodTracker({ onMoodLogged, recentMoods }: MoodTrackerProps) {
                   className="resize-none bg-input border-border"
                   rows={3}
                 />
+                {/* Submit button */}
                 <Button onClick={handleSubmit} className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>

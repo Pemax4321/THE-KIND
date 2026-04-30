@@ -45,6 +45,20 @@ export const DAILY_QUOTES: Quote[] = [
     quote: "The purpose of our lives is to be happy and spread happiness to others.",
     author: "Dalai Lama",
   },
+  { quote: "Every person has the ability to be kind. Use it every single day.", author: "Evan Carmen" },
+  { quote: "Kindness is strength.", author: "Unknown" },
+  { quote: "What a wonderful life I've had; I only wish I'd realized it sooner.", author: "Colette" },
+  { quote: "Humanity is divided into two groups: those who are kind and those who are not.", author: "Unknown" },
+  { quote: "Kindness in words creates confidence. Kindness in thinking creates profundity. Kindness in giving creates love.", author: "Lao Tzu" },
+  { quote: "The world breaks everyone, and afterward, many attempt kindness.", author: "Hemingway" },
+  { quote: "Three things in human life are important: the first is to be kind; the second is to be kind; and the third is to be kind.", author: "Henry James" },
+  { quote: "If you have the ability to stay calm, that's a form of kindness too.", author: "Unknown" },
+  { quote: "Kindness has wings—it flies to hearts near and far.", author: "Dodge" },
+  { quote: "My religion is very simple. My religion is kindness.", author: "Dalai Lama" },
+  { quote: "Every bit of effort counts when you're doing good.", author: "Unknown" },
+  { quote: "Tender words we speak to one another are as those invisible threads we use to tie hearts together.", author: "Frederick F. Van Ryn" },
+  { quote: "Do not wait for leaders; do it alone, person to person.", author: "Mother Teresa" },
+  { quote: "Kindness is the act of giving those who need it their dignity back.", author: "Maya Angelou" },
 ]
 
 /**

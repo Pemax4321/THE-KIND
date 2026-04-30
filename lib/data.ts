@@ -1,5 +1,4 @@
 import { supabase } from "./supabase"
-import { DEFAULT_KINDNESS_IDEAS } from "./kindness-ideas"
 import { getDailyQuote } from "./quotes"
 import { getMusicForMood, type MusicSuggestion } from "./music-config"
 import { APP_CONFIG } from "./config"
@@ -45,19 +44,74 @@ export interface CustomKindnessIdea {
   userId: string
   description: string
   category: string
+  completed: boolean
   createdAt: Date
+  completedAt?: Date
 }
 
-// Kindness Acts - Using default ideas from configuration
-export const kindnessIdeas = DEFAULT_KINDNESS_IDEAS
+/**
+ * Generate a random kindness idea using AI via API
+ * This function calls the secure backend endpoint
+ * @param userRole - User's role for personalized suggestions
+ * @param previousIdeas - Previous ideas to avoid duplicates
+ */
+export async function getRandomKindnessIdea(userRole?: string | null, previousIdeas: string[] = []) {
+  try {
+    const response = await fetch('/api/generate-kindness', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userRole: userRole || 'general',
+        previousIdeas: previousIdeas.slice(0, 10),
+      }),
+    })
 
-export function getRandomKindnessIdea() {
-  return kindnessIdeas[Math.floor(Math.random() * kindnessIdeas.length)]
+    if (!response.ok) {
+      throw new Error('Failed to generate kindness idea')
+    }
+
+    const data = await response.json()
+    if (data.success && data.idea) {
+      return {
+        description: data.idea.description,
+        category: data.idea.category,
+        source: 'ai' as const,
+      }
+    }
+    throw new Error(data.error || 'Failed to generate idea')
+  } catch (error) {
+    console.error('Error generating kindness idea:', error)
+    throw error
+  }
 }
 
-// ============================================
-// SYSTEM KINDNESS ACTS
-// ============================================
+/**
+ * Get a random kindness idea with role-based filtering and custom ideas
+ * @param customIdeas - User's custom kindness ideas
+ * @param userRole - User's role ('student', 'lecturer', or 'general')
+ * @returns A random kindness idea appropriate for the user
+ */
+export async function getRandomKindnessIdeaWithCustom(customIdeas: CustomKindnessIdea[], userRole?: string | null) {
+  try {
+    // Try to get AI-generated idea first
+    const aiIdea = await getRandomKindnessIdea(userRole, customIdeas.map(i => i.description))
+    return aiIdea
+  } catch (error) {
+    console.warn('AI generation failed, using custom ideas:', error)
+    // Fallback: return a random custom idea if available
+    if (customIdeas.length > 0) {
+      const randomCustom = customIdeas[Math.floor(Math.random() * customIdeas.length)]
+      return {
+        description: randomCustom.description,
+        category: randomCustom.category,
+      }
+    }
+    // If no custom ideas, throw error
+    throw new Error('No ideas available. Please add custom ideas or check AI service.')
+  }
+}
 
 export async function getAllSystemKindnessActs(): Promise<KindnessAct[]> {
   const { data, error } = await supabase
@@ -101,21 +155,34 @@ export async function addCustomKindnessIdea(userId: string, description: string,
 }
 
 export async function getCustomKindnessIdeas(userId: string): Promise<CustomKindnessIdea[]> {
-  const { data, error } = await supabase
-    .from(APP_CONFIG.collections.customIdeas)
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
+  try {
+    console.log("[DATA] getCustomKindnessIdeas: starting query for user", userId)
+    const { data, error } = await supabase
+      .from(APP_CONFIG.collections.customIdeas)
+      .select("id,user_id,description,category,completed,created_at,completed_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50)
 
-  if (error) throw error
+    if (error) {
+      console.error("[DATA] getCustomKindnessIdeas ERROR:", error.code, error.message)
+      throw error
+    }
 
-  return (data || []).map((item: any) => ({
-    id: item.id,
-    userId: item.user_id,
-    description: item.description,
-    category: item.category,
-    createdAt: new Date(item.created_at),
-  }))
+    console.log("[DATA] getCustomKindnessIdeas: success, got", data?.length ?? 0, "rows")
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      userId: item.user_id,
+      description: item.description,
+      category: item.category,
+      completed: item.completed || false,
+      createdAt: new Date(item.created_at),
+      completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
+    }))
+  } catch (error) {
+    console.error("[DATA] getCustomKindnessIdeas CAUGHT ERROR:", error)
+    throw error
+  }
 }
 
 export async function updateCustomKindnessIdea(ideaId: string, description: string, category: string) {
@@ -131,6 +198,18 @@ export async function updateCustomKindnessIdea(ideaId: string, description: stri
   if (error) throw error
 }
 
+export async function completeCustomKindnessIdea(ideaId: string) {
+  const { error } = await supabase
+    .from(APP_CONFIG.collections.customIdeas)
+    .update({
+      completed: true,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", ideaId)
+
+  if (error) throw error
+}
+
 export async function deleteCustomKindnessIdea(ideaId: string) {
   const { error } = await supabase
     .from(APP_CONFIG.collections.customIdeas)
@@ -138,14 +217,6 @@ export async function deleteCustomKindnessIdea(ideaId: string) {
     .eq("id", ideaId)
 
   if (error) throw error
-}
-
-export function getRandomKindnessIdeaWithCustom(customIdeas: CustomKindnessIdea[]) {
-  const allIdeas = [
-    ...kindnessIdeas,
-    ...customIdeas.map((idea) => ({ description: idea.description, category: idea.category }))
-  ]
-  return allIdeas[Math.floor(Math.random() * allIdeas.length)]
 }
 
 // ============================================
@@ -192,24 +263,34 @@ export async function deleteKindnessAct(actId: string) {
 }
 
 export async function getKindnessActs(userId: string): Promise<KindnessAct[]> {
-  const { data, error } = await supabase
-    .from(APP_CONFIG.collections.kindnessActs)
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(APP_CONFIG.kindness.maxEntriesPerQuery)
+  try {
+    console.log("[DATA] getKindnessActs: starting query for user", userId)
+    const { data, error } = await supabase
+      .from(APP_CONFIG.collections.kindnessActs)
+      .select("id,user_id,description,category,completed,created_at,completed_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(APP_CONFIG.kindness.maxEntriesPerQuery)
 
-  if (error) throw error
+    if (error) {
+      console.error("[DATA] getKindnessActs ERROR:", error.code, error.message)
+      throw error
+    }
 
-  return (data || []).map((item: any) => ({
-    id: item.id,
-    userId: item.user_id,
-    description: item.description,
-    category: item.category,
-    completed: item.completed,
-    createdAt: new Date(item.created_at),
-    completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
-  }))
+    console.log("[DATA] getKindnessActs: success, got", data?.length ?? 0, "rows")
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      userId: item.user_id,
+      description: item.description,
+      category: item.category,
+      completed: item.completed,
+      createdAt: new Date(item.created_at),
+      completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
+    }))
+  } catch (error) {
+    console.error("[DATA] getKindnessActs CAUGHT ERROR:", error)
+    throw error
+  }
 }
 
 export async function getCompletedKindnessActs(userId: string): Promise<KindnessAct[]> {
@@ -249,7 +330,7 @@ export const moodOptions = [
 ]
 
 export async function addMoodEntry(userId: string, mood: string, note?: string) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from(APP_CONFIG.collections.moods)
     .insert([
       {
@@ -259,32 +340,42 @@ export async function addMoodEntry(userId: string, mood: string, note?: string) 
         created_at: new Date().toISOString(),
       },
     ])
-    .select()
 
   if (error) throw error
-  return data[0].id
+  // Return success without needing to fetch back the ID
 }
 
 export async function getMoodEntries(userId: string, days: number = APP_CONFIG.moods.historyDays): Promise<MoodEntry[]> {
-  const startDate = new Date()
-  startDate.setDate(startDate.getDate() - days)
+  try {
+    console.log("[DATA] getMoodEntries: starting query for user", userId, "days:", days)
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
 
-  const { data, error } = await supabase
-    .from(APP_CONFIG.collections.moods)
-    .select("*")
-    .eq("user_id", userId)
-    .gte("created_at", startDate.toISOString())
-    .order("created_at", { ascending: false })
+    const { data, error } = await supabase
+      .from(APP_CONFIG.collections.moods)
+      .select("id,user_id,mood,note,created_at")
+      .eq("user_id", userId)
+      .gte("created_at", startDate.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(100)
 
-  if (error) throw error
+    if (error) {
+      console.error("[DATA] getMoodEntries ERROR:", error.code, error.message)
+      throw error
+    }
 
-  return (data || []).map((item: any) => ({
-    id: item.id,
-    userId: item.user_id,
-    mood: item.mood,
-    note: item.note,
-    createdAt: new Date(item.created_at),
-  }))
+    console.log("[DATA] getMoodEntries: success, got", data?.length ?? 0, "rows")
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      userId: item.user_id,
+      mood: item.mood,
+      note: item.note,
+      createdAt: new Date(item.created_at),
+    }))
+  } catch (error) {
+    console.error("[DATA] getMoodEntries CAUGHT ERROR:", error)
+    throw error
+  }
 }
 
 export async function getDailyMoodEntries(userId: string): Promise<MoodEntry[]> {
@@ -293,7 +384,7 @@ export async function getDailyMoodEntries(userId: string): Promise<MoodEntry[]> 
 
   const { data, error } = await supabase
     .from(APP_CONFIG.collections.moods)
-    .select("*")
+    .select("id,user_id,mood,note,created_at")
     .eq("user_id", userId)
     .gte("created_at", today.toISOString())
     .order("created_at", { ascending: false })
@@ -351,37 +442,57 @@ export async function deleteJournalEntry(entryId: string) {
 }
 
 export async function getJournalEntries(userId: string): Promise<JournalEntry[]> {
-  const { data, error } = await supabase
-    .from(APP_CONFIG.collections.journals)
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(APP_CONFIG.kindness.maxEntriesPerQuery)
+  try {
+    console.log("[DATA] getJournalEntries: starting query for user", userId)
+    const { data, error } = await supabase
+      .from(APP_CONFIG.collections.journals)
+      .select("id,user_id,title,content,mood,created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(30)
 
-  if (error) throw error
+    if (error) {
+      console.error("[DATA] getJournalEntries ERROR:", error.code, error.message)
+      throw error
+    }
 
-  return (data || []).map((item: any) => ({
-    id: item.id,
-    userId: item.user_id,
-    title: item.title,
-    content: item.content,
-    mood: item.mood,
-    createdAt: new Date(item.created_at),
-  }))
+    console.log("[DATA] getJournalEntries: success, got", data?.length ?? 0, "rows")
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      userId: item.user_id,
+      title: item.title,
+      content: item.content,
+      mood: item.mood,
+      createdAt: new Date(item.created_at),
+    }))
+  } catch (error) {
+    console.error("[DATA] getJournalEntries CAUGHT ERROR:", error)
+    throw error
+  }
 }
 
 // User Stats
-export async function getUserStats(userId: string): Promise<UserStats> {
-  const kindnessActs = await getKindnessActs(userId)
-  const moods = await getMoodEntries(userId, 30)
+/**
+ * OPTIMIZED: Calculate stats from pre-fetched data to avoid N+1 queries
+ * Use this when you already have the data from other fetches
+ */
+export function calculateUserStatsFromData(
+  kindnessActs: KindnessAct[],
+  customIdeas: CustomKindnessIdea[],
+  moods: MoodEntry[]
+): UserStats {
+  // Combine regular kindness acts with completed custom ideas
+  const allCompletedActs = kindnessActs.filter((act) => act.completed)
+  const completedCustomIdeas = customIdeas.filter((idea) => idea.completed)
 
-  const totalKindnessActs = kindnessActs.length
-  const completedKindnessActs = kindnessActs.filter((act) => act.completed).length
+  const totalKindnessActs = kindnessActs.length + customIdeas.length
+  const completedKindnessActs = allCompletedActs.length + completedCustomIdeas.length
 
-  // Calculate streak
-  const completedDates = kindnessActs
-    .filter((act) => act.completed && act.completedAt)
-    .map((act) => act.completedAt!.toDateString())
+  // Calculate streak including both regular acts and custom ideas
+  const completedDates = [
+    ...allCompletedActs.filter((act) => act.completedAt).map((act) => act.completedAt!.toDateString()),
+    ...completedCustomIdeas.filter((idea) => idea.completedAt).map((idea) => idea.completedAt!.toDateString()),
+  ]
 
   const uniqueDates = [...new Set(completedDates)]
   let currentStreak = 0
@@ -417,6 +528,14 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     longestStreak,
     moodHistory,
   }
+}
+
+export async function getUserStats(userId: string): Promise<UserStats> {
+  const kindnessActs = await getKindnessActs(userId)
+  const customIdeas = await getCustomKindnessIdeas(userId)
+  const moods = await getMoodEntries(userId, 30)
+
+  return calculateUserStatsFromData(kindnessActs, customIdeas, moods)
 }
 
 export async function getMoodTrend(userId: string, days: number = 7) {
@@ -457,9 +576,3 @@ export async function getMoodTrend(userId: string, days: number = 7) {
 export function getDailyQuoteFromData() {
   return getDailyQuote()
 }
-
-// Music Suggestions based on mood
-export function getMusicForMoodData(mood: string) {
-  return getMusicForMood(mood)
-}
-

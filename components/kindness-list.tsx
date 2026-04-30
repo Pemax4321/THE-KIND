@@ -1,3 +1,4 @@
+// Kindness List component - displays pending and completed kindness acts
 "use client"
 
 import { useState } from "react"
@@ -7,18 +8,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { Check, Trash2, Heart, Loader2 } from "lucide-react"
 
+// Props interface for KindnessList
 interface KindnessListProps {
-  acts: KindnessAct[]
-  onUpdate: () => void
-  loading: boolean
+  acts: KindnessAct[] // Array of kindness acts to display
+  onUpdate: () => void // Callback to refresh data after action
+  loading: boolean // Loading state indicator
 }
 
+// KindnessList component - shows pending and completed kindness acts with action buttons
 export function KindnessList({ acts, onUpdate, loading }: KindnessListProps) {
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null) // Tracks which act is being actioned
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null) // Delete confirmation state
 
+  // Marks a kindness act as completed
   const handleComplete = async (actId: string) => {
     setActionLoading(actId)
     try {
@@ -32,11 +46,13 @@ export function KindnessList({ acts, onUpdate, loading }: KindnessListProps) {
     }
   }
 
+  // Deletes a kindness act
   const handleDelete = async (actId: string) => {
     setActionLoading(actId)
     try {
       await deleteKindnessAct(actId)
       toast.success("Kindness act removed")
+      setDeleteConfirmId(null)
       onUpdate()
     } catch (error) {
       toast.error("Failed to delete")
@@ -45,15 +61,18 @@ export function KindnessList({ acts, onUpdate, loading }: KindnessListProps) {
     }
   }
 
+  // Helper function to get category color classes
   const getCategoryColorClass = (category: string) => {
     return getCategoryColor(category)
   }
 
+  // Separate acts into pending and completed
   const pendingActs = acts.filter((act) => !act.completed)
   const completedActs = acts.filter((act) => act.completed)
 
   return (
     <Card className="shadow-lg border-border/50">
+      {/* Card header with counts */}
       <CardHeader className="bg-accent/30 border-b border-border/30">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 rounded-full bg-accent/50 flex items-center justify-center">
@@ -68,34 +87,43 @@ export function KindnessList({ acts, onUpdate, loading }: KindnessListProps) {
         </div>
       </CardHeader>
       <CardContent className="p-0">
+        {/* Loading state */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : acts.length === 0 ? (
+          /* Empty state */
           <div className="text-center py-12 px-4">
             <Heart className="mx-auto h-12 w-12 text-muted-foreground/50 mb-3" />
             <p className="text-muted-foreground">No kindness acts yet. Generate one above!</p>
           </div>
         ) : (
+          /* Scrollable list of acts */
           <ScrollArea className="h-[400px]">
             <div className="p-4 space-y-3">
+              {/* Pending kindness acts */}
               {pendingActs.map((act) => (
                 <div
                   key={act.id}
                   className="p-4 rounded-lg border border-border/50 bg-card hover:bg-muted/30 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">
+                    {/* Act content */}
                     <div className="flex-1 min-w-0">
+                      {/* Category badge */}
                       <Badge variant="outline" className={`mb-2 text-xs ${getCategoryColorClass(act.category)}`}>
                         {act.category}
                       </Badge>
+                      {/* Act description and date */}
                       <p className="text-sm text-foreground">{act.description}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Added {act.createdAt.toLocaleDateString()}
                       </p>
                     </div>
+                    {/* Action buttons */}
                     <div className="flex gap-1 shrink-0">
+                      {/* Complete button */}
                       <Button
                         size="icon"
                         variant="ghost"
@@ -110,11 +138,12 @@ export function KindnessList({ acts, onUpdate, loading }: KindnessListProps) {
                         )}
                         <span className="sr-only">Complete</span>
                       </Button>
+                      {/* Delete button */}
                       <Button
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDelete(act.id)}
+                        onClick={() => setDeleteConfirmId(act.id)}
                         disabled={actionLoading === act.id}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -124,20 +153,24 @@ export function KindnessList({ acts, onUpdate, loading }: KindnessListProps) {
                   </div>
                 </div>
               ))}
+              {/* Completed acts section */}
               {completedActs.length > 0 && (
                 <>
                   <div className="py-2">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Completed</p>
                   </div>
+                  {/* Show last 5 completed acts */}
                   {completedActs.slice(0, 5).map((act) => (
                     <div
                       key={act.id}
                       className="p-4 rounded-lg border border-border/30 bg-muted/20 opacity-70"
                     >
                       <div className="flex items-start gap-3">
+                        {/* Completion indicator */}
                         <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center shrink-0 mt-0.5">
                           <Check className="h-3 w-3 text-accent" />
                         </div>
+                        {/* Completed act info */}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-muted-foreground line-through">{act.description}</p>
                           <p className="text-xs text-muted-foreground/70 mt-1">
@@ -153,6 +186,28 @@ export function KindnessList({ acts, onUpdate, loading }: KindnessListProps) {
           </ScrollArea>
         )}
       </CardContent>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete act?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this kindness act? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={actionLoading !== null}
+            >
+              {actionLoading ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
